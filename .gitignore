@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Dataset e outputs
+dataset/
+runs_rtdetr/
+*.pth
+*.pt
+*.ckpt
+
+# Diretórios de teste temporários
+test_*/
+dataset_test_*/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+!env.example
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+

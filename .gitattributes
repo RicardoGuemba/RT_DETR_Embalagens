@@ -1,0 +1,5 @@
+# Garantir que arquivos sensíveis não sejam processados incorretamente
+.env filter=git-crypt diff=git-crypt
+*.key filter=git-crypt diff=git-crypt
+*.pem filter=git-crypt diff=git-crypt
+
