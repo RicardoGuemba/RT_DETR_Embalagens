@@ -7,6 +7,66 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 import torch
 from PIL import Image
+from datetime import datetime
+
+
+def ensure_coco_info(coco_data: Dict) -> Dict:
+    """
+    Garante que o JSON COCO tenha o campo 'info' obrigatório.
+    pycocotools requer este campo para funcionar corretamente.
+    
+    Args:
+        coco_data: Dict com dados COCO
+        
+    Returns:
+        Dict com campo 'info' garantido
+    """
+    if "info" not in coco_data:
+        coco_data["info"] = {
+            "description": "Dataset COCO exportado do Roboflow",
+            "version": "1.0",
+            "year": datetime.now().year,
+            "contributor": "Roboflow",
+            "date_created": datetime.now().strftime("%Y-%m-%d")
+        }
+    
+    return coco_data
+
+
+def ensure_coco_info_file(json_path: Path) -> None:
+    """
+    Garante que o arquivo JSON COCO tenha o campo 'info' obrigatório.
+    Modifica o arquivo in-place se necessário.
+    
+    Args:
+        json_path: Caminho do arquivo JSON COCO
+    """
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        if "info" not in data:
+            data["info"] = {
+                "description": "Dataset COCO exportado do Roboflow",
+                "version": "1.0",
+                "year": datetime.now().year,
+                "contributor": "Roboflow",
+                "date_created": datetime.now().strftime("%Y-%m-%d")
+            }
+            
+            # Fazer backup antes de modificar
+            backup_path = json_path.with_suffix('.json.backup')
+            if not backup_path.exists():
+                import shutil
+                shutil.copy2(json_path, backup_path)
+            
+            # Salvar arquivo corrigido
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            print(f"✅ Campo 'info' adicionado em {json_path.name}")
+    except Exception as e:
+        print(f"⚠️  Erro ao garantir campo 'info' em {json_path}: {e}")
 
 
 def load_coco_json(json_path: Path) -> Dict:

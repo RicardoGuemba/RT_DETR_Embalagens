@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Interface interativa para gerenciar treinamento, predição e download de dados.
+Interface CLI para ObjectDetection_DETR
+Gerencia treinamento, predição e download de dados.
 """
 
 import os
@@ -19,7 +20,7 @@ def clear_screen():
 def print_header():
     """Imprime cabeçalho."""
     print("="*70)
-    print("🚀 RT-DETR - Interface de Gerenciamento")
+    print("🚀 ObjectDetection_DETR - Interface de Gerenciamento")
     print("="*70)
     print()
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script para avaliar modelo RT-DETR usando COCOeval.
+Script para avaliar modelo DETR/RT-DETR usando COCOeval - ObjectDetection_DETR.
 """
 
 import json
@@ -13,7 +13,7 @@ from pycocotools.cocoeval import COCOeval
 from transformers import AutoImageProcessor, AutoModelForObjectDetection, DetrImageProcessor
 from PIL import Image
 
-from coco_utils import load_coco_json, create_coco_results
+from coco_utils import load_coco_json, create_coco_results, ensure_coco_info_file
 
 
 def get_device():
@@ -71,6 +71,10 @@ def evaluate_model(
     json_path = dataset_dir / f"{split}/_annotations.coco.json"
     if not json_path.exists():
         raise FileNotFoundError(f"JSON não encontrado: {json_path}")
+    
+    # CRÍTICO: Garantir que o JSON COCO tenha o campo 'info' obrigatório
+    # pycocotools requer este campo para funcionar corretamente
+    ensure_coco_info_file(json_path)
     
     coco_gt = COCO(str(json_path))
     coco_data = load_coco_json(json_path)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Interface Tkinter moderna para gerenciar treinamento, predição e download de dados.
+Interface Tkinter moderna para ObjectDetection_DETR
+Gerencia treinamento, predição e download de dados.
 Design moderno com estado da arte em UI/UX.
 """
 
@@ -22,7 +23,7 @@ class ModernTkinterApp:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("🚀 RT-DETR - Interface de Gerenciamento")
+        self.root.title("🚀 ObjectDetection_DETR - Interface de Gerenciamento")
         self.root.geometry("1200x800")
         self.root.minsize(1000, 700)
         
@@ -78,7 +79,7 @@ class ModernTkinterApp:
         
         title_label = ttk.Label(
             title_frame,
-            text="🚀 RT-DETR - Sistema de Detecção de Embalagens",
+            text="🚀 ObjectDetection_DETR - Sistema de Detecção de Objetos",
             style="Title.TLabel"
         )
         title_label.pack()
@@ -184,7 +185,7 @@ class ModernTkinterApp:
         self.existing_frame = ttk.LabelFrame(scrollable_frame, text="Dataset Existente", padding=15)
         
         ttk.Label(self.existing_frame, text="Caminho:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.existing_dataset_var = tk.StringVar(value="/Users/ricardoguembarovski/Documents/Documentos_MacBook_Pro/Realtec/Buddmeyer/Automacao_Robo/RT_DETR_Embalagens/test_roboflow_v2")
+        self.existing_dataset_var = tk.StringVar(value="")
         existing_entry = ttk.Entry(self.existing_frame, textvariable=self.existing_dataset_var, width=50)
         existing_entry.grid(row=0, column=1, sticky=tk.W+tk.E, padx=5, pady=5)
         ttk.Button(
@@ -953,19 +954,57 @@ class ModernTkinterApp:
         max_det_entry = ttk.Entry(params_frame, textvariable=self.max_detections_var, width=15)
         max_det_entry.grid(row=2, column=1, padx=5, pady=8)
         
-        # Diretórios
-        dirs_frame = ttk.LabelFrame(left_panel, text="Diretórios", padding=15)
+        # Tipo de entrada
+        input_type_frame = ttk.LabelFrame(left_panel, text="Tipo de Entrada", padding=15)
+        input_type_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        self.inference_input_type_var = tk.StringVar(value="directory")
+        ttk.Radiobutton(
+            input_type_frame,
+            text="📁 Pasta de Imagens",
+            variable=self.inference_input_type_var,
+            value="directory",
+            command=self.update_inference_input_ui
+        ).grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        
+        ttk.Radiobutton(
+            input_type_frame,
+            text="🖼️  Imagem Única",
+            variable=self.inference_input_type_var,
+            value="image",
+            command=self.update_inference_input_ui
+        ).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        ttk.Radiobutton(
+            input_type_frame,
+            text="📹 Vídeo",
+            variable=self.inference_input_type_var,
+            value="video",
+            command=self.update_inference_input_ui
+        ).grid(row=0, column=2, sticky=tk.W, padx=5, pady=5)
+        
+        # Diretórios/Arquivos
+        dirs_frame = ttk.LabelFrame(left_panel, text="Entrada", padding=15)
         dirs_frame.pack(fill=tk.X, pady=(0, 20))
         
         ttk.Label(dirs_frame, text="Input:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
         self.inference_input_var = tk.StringVar(value="dataset/test")
-        ttk.Entry(dirs_frame, textvariable=self.inference_input_var, width=25).grid(row=0, column=1, padx=5, pady=5)
-        ttk.Button(dirs_frame, text="📁", command=lambda: self.browse_directory(self.inference_input_var)).grid(row=0, column=2, padx=5)
+        self.inference_input_entry = ttk.Entry(dirs_frame, textvariable=self.inference_input_var, width=25)
+        self.inference_input_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.inference_browse_btn = ttk.Button(
+            dirs_frame,
+            text="📁",
+            command=self.browse_inference_input
+        )
+        self.inference_browse_btn.grid(row=0, column=2, padx=5)
         
         ttk.Label(dirs_frame, text="Output:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
         self.inference_output_var = tk.StringVar(value="runs_rtdetr/infer_out")
         ttk.Entry(dirs_frame, textvariable=self.inference_output_var, width=25).grid(row=1, column=1, padx=5, pady=5)
         ttk.Button(dirs_frame, text="📁", command=lambda: self.browse_directory(self.inference_output_var)).grid(row=1, column=2, padx=5)
+        
+        # Atualizar UI inicialmente
+        self.update_inference_input_ui()
         
         # Botões
         buttons_frame = ttk.Frame(left_panel)
@@ -1086,6 +1125,54 @@ class ModernTkinterApp:
         directory = filedialog.askdirectory(initialdir=var.get())
         if directory:
             var.set(directory)
+    
+    def browse_inference_input(self):
+        """Abre diálogo para selecionar entrada (diretório, imagem ou vídeo)."""
+        input_type = self.inference_input_type_var.get()
+        
+        if input_type == "directory":
+            directory = filedialog.askdirectory(initialdir=self.inference_input_var.get())
+            if directory:
+                self.inference_input_var.set(directory)
+        elif input_type == "image":
+            file_path = filedialog.askopenfilename(
+                initialdir=self.inference_input_var.get() if Path(self.inference_input_var.get()).exists() else ".",
+                title="Selecionar Imagem",
+                filetypes=[
+                    ("Imagens", "*.jpg *.jpeg *.png *.bmp *.tiff"),
+                    ("Todos os arquivos", "*.*")
+                ]
+            )
+            if file_path:
+                self.inference_input_var.set(file_path)
+        elif input_type == "video":
+            file_path = filedialog.askopenfilename(
+                initialdir=self.inference_input_var.get() if Path(self.inference_input_var.get()).exists() else ".",
+                title="Selecionar Vídeo",
+                filetypes=[
+                    ("Vídeos", "*.mp4 *.avi *.mov *.mkv *.flv *.wmv"),
+                    ("Todos os arquivos", "*.*")
+                ]
+            )
+            if file_path:
+                self.inference_input_var.set(file_path)
+    
+    def update_inference_input_ui(self):
+        """Atualiza UI baseado no tipo de entrada selecionado."""
+        input_type = self.inference_input_type_var.get()
+        
+        if input_type == "directory":
+            if not self.inference_input_var.get() or not Path(self.inference_input_var.get()).exists():
+                self.inference_input_var.set("dataset/test")
+            self.inference_browse_btn.config(text="📁")
+        elif input_type == "image":
+            if Path(self.inference_input_var.get()).is_dir():
+                self.inference_input_var.set("")
+            self.inference_browse_btn.config(text="🖼️")
+        elif input_type == "video":
+            if Path(self.inference_input_var.get()).is_dir():
+                self.inference_input_var.set("")
+            self.inference_browse_btn.config(text="📹")
     
     def update_status_bar(self, message):
         """Atualiza barra de status."""
@@ -1439,10 +1526,18 @@ class ModernTkinterApp:
             messagebox.showerror("Erro", f"Modelo não encontrado: {model_dir}")
             return
         
-        input_dir = self.inference_input_var.get()
-        if not Path(input_dir).exists():
-            messagebox.showerror("Erro", f"Diretório não encontrado: {input_dir}")
-            return
+        input_path = self.inference_input_var.get()
+        input_type = self.inference_input_type_var.get()
+        
+        # Validar entrada baseado no tipo
+        if input_type == "directory":
+            if not Path(input_path).exists():
+                messagebox.showerror("Erro", f"Diretório não encontrado: {input_path}")
+                return
+        else:  # image ou video
+            if not Path(input_path).exists():
+                messagebox.showerror("Erro", f"Arquivo não encontrado: {input_path}")
+                return
         
         score_threshold = self.score_threshold_var.get()
         iou_threshold = self.iou_threshold_var.get()
@@ -1453,22 +1548,40 @@ class ModernTkinterApp:
         self.log_message(self.inference_log, "="*70)
         self.log_message(self.inference_log, "Iniciando predição...")
         self.log_message(self.inference_log, f"Modelo: {model_dir}")
-        self.log_message(self.inference_log, f"Input: {input_dir}")
+        self.log_message(self.inference_log, f"Tipo: {input_type}")
+        self.log_message(self.inference_log, f"Input: {input_path}")
         self.log_message(self.inference_log, f"Score Threshold: {score_threshold:.2f}")
         self.log_message(self.inference_log, f"IOU Threshold: {iou_threshold:.2f}")
         self.log_message(self.inference_log, "="*70)
         
         def inference_thread():
             try:
-                cmd = [
-                    sys.executable, "src/infer_images.py",
-                    "--model_dir", model_dir,
-                    "--input_dir", input_dir,
-                    "--out_dir", self.inference_output_var.get(),
-                    "--score_threshold", str(score_threshold),
-                    "--iou_threshold", str(iou_threshold),
-                    "--dataset_dir", "dataset"
-                ]
+                # Determinar qual script usar
+                if input_type == "video":
+                    # Usar script de vídeo
+                    cmd = [
+                        sys.executable, "src/infer_video.py",
+                        "--model_dir", model_dir,
+                        "--video_path", input_path,
+                        "--out_path", str(Path(self.inference_output_var.get()) / f"annotated_{Path(input_path).name}"),
+                        "--score_threshold", str(score_threshold),
+                        "--dataset_dir", "dataset"
+                    ]
+                else:
+                    # Usar script de imagens (suporta diretório ou arquivo único)
+                    cmd = [
+                        sys.executable, "src/infer_images.py",
+                        "--model_dir", model_dir,
+                        "--out_dir", self.inference_output_var.get(),
+                        "--score_threshold", str(score_threshold),
+                        "--iou_threshold", str(iou_threshold),
+                        "--dataset_dir", "dataset"
+                    ]
+                    
+                    if input_type == "image":
+                        cmd.extend(["--input_file", input_path])
+                    else:  # directory
+                        cmd.extend(["--input_dir", input_path])
                 
                 self.inference_process = subprocess.Popen(
                     cmd,

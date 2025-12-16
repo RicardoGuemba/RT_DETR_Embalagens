@@ -1,6 +1,6 @@
-# RT-DETR - Treinamento para Detecção de Embalagens
+# ObjectDetection_DETR - Sistema de Detecção de Objetos
 
-Sistema completo para treinar e avaliar modelos RT-DETR usando datasets COCO JSON do Roboflow, otimizado para MacBook com Apple Silicon (MPS).
+Sistema completo para treinar e avaliar modelos DETR/RT-DETR usando datasets COCO JSON do Roboflow, otimizado para MacBook com Apple Silicon (MPS).
 
 ## 🚀 Início Rápido
 
@@ -13,13 +13,13 @@ source .venv/bin/activate
 python app.py
 ```
 
-O `app.py` é o ponto de entrada principal que permite escolher entre as três interfaces disponíveis.
+O `app.py` é o ponto de entrada principal que inicia a interface Tkinter.
 
 ## 🎯 Interface Gráfica
 
 O projeto oferece uma **interface gráfica Tkinter totalmente visual** para facilitar o uso:
 
-### Interface Tkinter (Recomendada - Design Moderno) ⭐
+### Interface Tkinter (Design Moderno) ⭐
 
 Interface gráfica desktop moderna com design estado da arte:
 
@@ -65,21 +65,15 @@ source .venv/bin/activate
 python app.py
 ```
 
-Isso abrirá um menu para escolher a interface:
-- **Interface Tkinter** (Desktop - Recomendada)
-- **Interface CLI** (Linha de Comando)
-- **Interface Web** (Streamlit)
+Isso iniciará a interface gráfica Tkinter automaticamente.
 
 Ou execute diretamente:
 ```bash
-# Interface Tkinter
+# Interface Tkinter (Recomendada)
 python interface_tkinter.py
 
-# Interface CLI
+# Interface CLI (Linha de Comando)
 python interface.py
-
-# Interface Web
-streamlit run interface_web.py
 ```
 
 ### 4. Configurar Variáveis de Ambiente
@@ -176,10 +170,13 @@ python src/infer_images.py --model_dir runs_rtdetr/model_best --input_dir datase
 ## 📁 Estrutura do Projeto
 
 ```
-rtdetr-embalagens/
+ObjectDetection_DETR/
   README.md
   requirements.txt
   .env.example
+  app.py                          # Ponto de entrada principal (Tkinter)
+  interface_tkinter.py            # Interface gráfica Tkinter
+  interface.py                    # Interface CLI (alternativa)
   dataset/                        # gerado pelo download
   runs_rtdetr/                    # outputs (checkpoints, logs, modelos)
   scripts/
@@ -190,6 +187,7 @@ rtdetr-embalagens/
     train_rtdetr.py
     eval_coco.py
     infer_images.py
+    infer_video.py
     coco_utils.py
 ```
 
@@ -199,12 +197,73 @@ rtdetr-embalagens/
 - MacBook com Apple Silicon (M4 ou superior)
 - PyTorch com suporte MPS
 
-## 📊 Métricas
+## 📊 Métricas de Treinamento
 
-O sistema avalia:
-- **mAP** (AP@[0.50:0.95])
-- **AP50**, **AP75**
-- **Precision@0.5**, **Recall@0.5**
+O sistema agora exibe e salva métricas detalhadas durante o treinamento:
+
+### Métricas por Step (durante treinamento)
+- **Loss Total**, **Loss CE**, **Loss BBox**, **Loss GIoU**
+- **Learning Rate**
+- **Tempo por iteração**
+
+### Métricas de Validação (ao final de cada época)
+- **mAP@[0.5:0.95]**, **mAP@0.5**, **mAP@0.75**
+- **Precision**, **Recall**, **AR (Average Recall)**
+
+### Arquivos de Log Gerados
+
+Os logs são salvos automaticamente em `runs_rtdetr/runs/`:
+
+- **`train_metrics.csv`**: Métricas de treinamento por step
+  - Colunas: `epoch`, `step`, `loss_total`, `loss_ce`, `loss_bbox`, `loss_giou`, `lr`, `time_per_iter`
+  
+- **`val_metrics.csv`**: Métricas de validação por época
+  - Colunas: `epoch`, `step`, `loss`, `mAP_0.5_0.95`, `mAP_0.5`, `mAP_0.75`, `precision`, `recall`, `AR`
+  
+- **`metrics.jsonl`**: Histórico completo em formato JSONL (1 linha por época)
+
+### TensorBoard
+
+O sistema também gera logs para TensorBoard:
+
+```bash
+# Instalar TensorBoard (se ainda não instalado)
+pip install tensorboard
+
+# Visualizar métricas durante/após treinamento
+tensorboard --logdir runs_rtdetr/tb
+```
+
+Acesse `http://localhost:6006` no navegador para visualizar gráficos interativos das métricas.
+
+### Exemplo de Saída no Console
+
+Durante o treinamento, você verá:
+
+```
+======================================================================
+📊 TREINAMENTO - Step 50 | Época 0.1250
+======================================================================
+  Loss Total:        2.345678 (avg: 2.456789)
+  Loss CE:           1.234567 (avg: 1.345678)
+  Loss BBox:         0.567890 (avg: 0.678901)
+  Loss GIoU:         0.543210 (avg: 0.432109)
+  Learning Rate:     0.00001000
+  Tempo/Iter:        0.1234s
+======================================================================
+
+======================================================================
+📊 VALIDAÇÃO - Step 500 | Época 1.2500
+======================================================================
+  Loss:              2.123456
+  mAP@0.5:0.95:      0.3456 (34.56%)
+  mAP@0.5:           0.4567 (45.67%)
+  mAP@0.75:          0.2345 (23.45%)
+  Precision:         0.5678 (56.78%)
+  Recall:            0.4321 (43.21%)
+  AR (Average Recall): 0.4890 (48.90%)
+======================================================================
+```
 
 ## 🎯 Parâmetros Recomendados (Mac M4)
 

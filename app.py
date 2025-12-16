@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Aplicação principal RT-DETR - Sistema de Detecção de Embalagens
+Aplicação principal ObjectDetection_DETR - Sistema de Detecção de Objetos
 Ponto de entrada principal do sistema.
 """
 
@@ -39,7 +39,7 @@ def check_dependencies():
 
 def main():
     """Função principal que inicia a interface."""
-    print("🚀 RT-DETR - Sistema de Detecção de Embalagens")
+    print("🚀 ObjectDetection_DETR - Sistema de Detecção de Objetos")
     print("=" * 60)
     print()
     
