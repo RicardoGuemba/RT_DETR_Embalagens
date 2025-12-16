@@ -27,9 +27,9 @@ def get_device():
     return torch.device("cpu")
 
 
-def draw_bbox_opencv(frame, bbox, label, score, color=(0, 255, 0), thickness=2, control_id=None, show_control_id=False):
+def draw_bbox_opencv(frame, bbox, label, score, color=(0, 255, 0), thickness=2, control_id=None, show_control_id=False, show_centroid=False):
     """
-    Desenha bounding box no frame OpenCV.
+    Desenha bounding box no frame OpenCV com centroide opcional.
     
     Args:
         frame: Frame OpenCV (numpy array BGR)
@@ -40,11 +40,24 @@ def draw_bbox_opencv(frame, bbox, label, score, color=(0, 255, 0), thickness=2, 
         thickness: Espessura da linha
         control_id: ID único de controle (opcional)
         show_control_id: Se True, exibe o control_id no texto
+        show_centroid: Se True, desenha centroide vermelho (apenas para melhor detecção)
     """
     x1, y1, x2, y2 = [int(coord) for coord in bbox]
     
+    # Calcular centroide
+    centroid_x = int((x1 + x2) / 2)
+    centroid_y = int((y1 + y2) / 2)
+    
     # Desenhar retângulo
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
+    
+    # Desenhar centroide vermelho apenas se solicitado (melhor detecção)
+    if show_centroid:
+        centroid_radius = 6  # Pequeno círculo vermelho
+        # Círculo preenchido vermelho (BGR: (0, 0, 255))
+        cv2.circle(frame, (centroid_x, centroid_y), centroid_radius, (0, 0, 255), -1)
+        # Borda branca para destacar
+        cv2.circle(frame, (centroid_x, centroid_y), centroid_radius, (255, 255, 255), 2)
     
     # Texto com label e score
     text = f"{label} {score:.2f}"
@@ -246,30 +259,51 @@ def infer_video(
                 threshold=score_threshold
             )[0]
             
-            # Desenhar bboxes no frame
-            frame_detections = []
+            # Coletar todas as detecções primeiro para identificar a melhor
+            detections = []
             for box, score, label in zip(
                 results["boxes"].cpu().numpy(),
                 results["scores"].cpu().numpy(),
                 results["labels"].cpu().numpy()
             ):
                 x1, y1, x2, y2 = box.tolist()
+                detections.append({
+                    "box": [x1, y1, x2, y2],
+                    "score": float(score),
+                    "label": int(label)
+                })
+            
+            # Identificar detecção com maior score (melhor confiança)
+            best_detection_idx = None
+            best_score = -1.0
+            if detections:
+                for idx, det in enumerate(detections):
+                    if det["score"] > best_score:
+                        best_score = det["score"]
+                        best_detection_idx = idx
+            
+            # Desenhar bboxes no frame
+            frame_detections = []
+            for idx, det in enumerate(detections):
+                x1, y1, x2, y2 = det["box"]
                 
                 # Gerar ID único de controle (contador sequencial - mais rápido que UUID)
                 control_id_counter += 1
                 control_id = f"det_{control_id_counter:08d}"
                 
                 # Obter nome da categoria
-                label_name = category_names.get(int(label), f"Class_{int(label)}")
+                label_name = category_names.get(det["label"], f"Class_{det['label']}")
                 
-                # Desenhar no frame
+                # Desenhar no frame - mostrar centroide vermelho apenas para melhor detecção
+                show_centroid = (idx == best_detection_idx)
                 draw_bbox_opencv(
                     frame,
                     [x1, y1, x2, y2],
                     label_name,
-                    float(score),
+                    det["score"],
                     control_id=control_id,
-                    show_control_id=show_control_id
+                    show_control_id=show_control_id,
+                    show_centroid=show_centroid
                 )
                 
                 # Calcular informações adicionais do bbox (manter em float para performance)
@@ -282,10 +316,11 @@ def infer_video(
                 detection_data = {
                     "frame": frame_count,
                     "bbox": [float(x1), float(y1), float(x2), float(y2)],
-                    "category_id": int(label),
+                    "category_id": det["label"],
                     "category_name": label_name,
-                    "score": float(score),
-                    "control_id": control_id
+                    "score": det["score"],
+                    "control_id": control_id,
+                    "is_best": show_centroid  # Marcar se é a melhor detecção
                 }
                 frame_detections.append(detection_data)
                 
@@ -318,18 +353,18 @@ def infer_video(
             # Escrever frame processado
             out_video.write(frame)
             
-            # Mostrar preview se solicitado
+            # Mostrar preview se solicitado (em tempo real com velocidade do vídeo)
             if show_preview:
-                cv2.imshow('Preview', frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                cv2.imshow('Preview - Predições em Tempo Real (Pressione Q para sair)', frame)
+                # Calcular delay baseado no FPS do vídeo para manter velocidade natural
+                delay_ms = int(1000 / fps) if fps > 0 else 33  # Converter FPS para ms
+                key = cv2.waitKey(delay_ms) & 0xFF
+                if key == ord('q') or key == ord('Q'):
                     print("\n⚠️  Preview interrompido pelo usuário")
                     break
             
             # Atualizar progresso
             pbar.update(1)
-            
-            # Manter velocidade natural do vídeo (não necessário aqui pois estamos salvando)
-            # Mas podemos adicionar um pequeno delay se necessário para preview
     
     pbar.close()
     cap.release()

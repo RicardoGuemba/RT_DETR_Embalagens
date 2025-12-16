@@ -948,11 +948,21 @@ class ModernTkinterApp:
         self.iou_threshold_label.grid(row=1, column=2, padx=5)
         iou_scale.configure(command=lambda v: self.iou_threshold_label.config(text=f"{float(v):.2f}"))
         
-        # FPS (para visualização, não usado no modelo mas pode ser útil)
+        # Max Detections
         ttk.Label(params_frame, text="Max Detections:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=8)
         self.max_detections_var = tk.StringVar(value="100")
         max_det_entry = ttk.Entry(params_frame, textvariable=self.max_detections_var, width=15)
         max_det_entry.grid(row=2, column=1, padx=5, pady=8)
+        
+        # Preview em tempo real (apenas para vídeo)
+        self.show_preview_var = tk.BooleanVar(value=False)
+        self.preview_check = ttk.Checkbutton(
+            params_frame,
+            text="📺 Exibir preview em tempo real (velocidade do vídeo)",
+            variable=self.show_preview_var,
+            state=tk.DISABLED  # Inicialmente desabilitado até selecionar vídeo
+        )
+        self.preview_check.grid(row=3, column=0, columnspan=3, sticky=tk.W, padx=5, pady=8)
         
         # Tipo de entrada
         input_type_frame = ttk.LabelFrame(left_panel, text="Tipo de Entrada", padding=15)
@@ -1165,14 +1175,25 @@ class ModernTkinterApp:
             if not self.inference_input_var.get() or not Path(self.inference_input_var.get()).exists():
                 self.inference_input_var.set("dataset/test")
             self.inference_browse_btn.config(text="📁")
+            # Desabilitar preview para diretório
+            if hasattr(self, 'preview_check'):
+                self.preview_check.config(state=tk.DISABLED)
+                self.show_preview_var.set(False)
         elif input_type == "image":
             if Path(self.inference_input_var.get()).is_dir():
                 self.inference_input_var.set("")
             self.inference_browse_btn.config(text="🖼️")
+            # Desabilitar preview para imagem
+            if hasattr(self, 'preview_check'):
+                self.preview_check.config(state=tk.DISABLED)
+                self.show_preview_var.set(False)
         elif input_type == "video":
             if Path(self.inference_input_var.get()).is_dir():
                 self.inference_input_var.set("")
             self.inference_browse_btn.config(text="📹")
+            # Habilitar preview apenas para vídeo
+            if hasattr(self, 'preview_check'):
+                self.preview_check.config(state=tk.NORMAL)
     
     def update_status_bar(self, message):
         """Atualiza barra de status."""
@@ -1567,6 +1588,9 @@ class ModernTkinterApp:
                         "--score_threshold", str(score_threshold),
                         "--dataset_dir", "dataset"
                     ]
+                    # Adicionar preview se solicitado
+                    if self.show_preview_var.get():
+                        cmd.append("--show_preview")
                 else:
                     # Usar script de imagens (suporta diretório ou arquivo único)
                     cmd = [
