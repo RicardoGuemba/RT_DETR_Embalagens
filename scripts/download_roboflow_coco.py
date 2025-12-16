@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
 Script para baixar dataset COCO do Roboflow.
-Suporta três métodos: SDK Python, curl (Terminal), ou usar dataset existente.
+Implementação simples seguindo a documentação oficial.
 """
 
 import os
 import argparse
-import tempfile
 import shutil
 import time
 import json
@@ -17,6 +16,16 @@ from dotenv import load_dotenv
 def download_with_curl(download_url: str, output_dir: Path) -> Path:
     """Baixa dataset usando curl + unzip (método Terminal do Roboflow)."""
     print("📥 Usando método curl (Terminal)...")
+    
+    # Criar diretório de saída se não existir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Limpar diretório de destino antes de baixar
+    for item in output_dir.iterdir():
+        if item.is_dir():
+            shutil.rmtree(item)
+        elif not item.name.startswith('.'):
+            item.unlink()
     
     temp_zip = output_dir / "roboflow_temp.zip"
     
@@ -30,15 +39,21 @@ def download_with_curl(download_url: str, output_dir: Path) -> Path:
             text=True
         )
         
+        if not temp_zip.exists() or temp_zip.stat().st_size == 0:
+            raise RuntimeError("Download falhou: arquivo ZIP vazio ou não encontrado")
+        
+        print(f"   ✅ Download concluído: {temp_zip.stat().st_size / 1024 / 1024:.2f} MB")
+        
         # Extrair ZIP
         print("   ⏳ Extraindo arquivos...")
         subprocess.run(
-            ["unzip", "-q", str(temp_zip), "-d", str(output_dir)],
+            ["unzip", "-q", "-o", str(temp_zip), "-d", str(output_dir)],
             check=True
         )
         
         # Remover ZIP temporário
         temp_zip.unlink()
+        print("   ✅ Extração concluída")
         
         # Encontrar diretório extraído (pode ter estrutura aninhada)
         extracted_dirs = [d for d in output_dir.iterdir() if d.is_dir() and not d.name.startswith('.')]
@@ -46,6 +61,7 @@ def download_with_curl(download_url: str, output_dir: Path) -> Path:
         if len(extracted_dirs) == 1:
             # Se há apenas um diretório, mover conteúdo para o nível superior
             extracted_dir = extracted_dirs[0]
+            print(f"   📦 Reorganizando estrutura (diretório aninhado: {extracted_dir.name})...")
             for item in extracted_dir.iterdir():
                 dest = output_dir / item.name
                 if dest.exists():
@@ -55,83 +71,188 @@ def download_with_curl(download_url: str, output_dir: Path) -> Path:
                         dest.unlink()
                 shutil.move(str(item), str(output_dir))
             extracted_dir.rmdir()
+            print("   ✅ Estrutura reorganizada")
+        
+        # Aguardar um pouco para garantir que arquivos foram escritos
+        time.sleep(1)
         
         return output_dir
         
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Erro ao baixar com curl: {e.stderr}")
-    except FileNotFoundError:
-        raise RuntimeError("curl ou unzip não encontrado. Instale: brew install curl unzip")
+        if temp_zip.exists():
+            temp_zip.unlink()
+        error_msg = e.stderr if e.stderr else str(e)
+        raise RuntimeError(f"Erro ao baixar com curl: {error_msg}")
+    except FileNotFoundError as e:
+        raise RuntimeError(f"Ferramenta não encontrada: {e}. Instale: brew install curl unzip")
+    except Exception as e:
+        if temp_zip.exists():
+            temp_zip.unlink()
+        raise RuntimeError(f"Erro inesperado no download curl: {e}")
 
 def download_with_sdk(api_key: str, workspace: str, project: str, version: int, output_dir: Path) -> Path:
-    """Baixa dataset usando SDK Python do Roboflow."""
-    print("📥 Usando método SDK Python...")
+    """
+    Baixa dataset usando SDK Python do Roboflow.
+    Implementação simples e direta seguindo a documentação oficial.
+    """
+    print("📥 Usando método SDK Python do Roboflow...")
     
     try:
         from roboflow import Roboflow
     except ImportError:
         raise ImportError("SDK do Roboflow não instalado. Execute: pip install roboflow")
     
-    # Usar diretório temporário
-    temp_dir = Path(tempfile.mkdtemp(prefix="roboflow_download_"))
+    # Limpar e criar diretório de saída
+    if output_dir.exists():
+        print(f"   🗑️  Limpando diretório existente...")
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     try:
+        # Seguir exatamente a documentação do Roboflow
+        print(f"   🔗 Conectando ao Roboflow...")
         rf = Roboflow(api_key=api_key)
+        
+        print(f"   📂 Acessando workspace '{workspace}' e projeto '{project}'...")
         project_obj = rf.workspace(workspace).project(project)
         
-        print("   ⏳ Aguardando download e extração...")
-        dataset = project_obj.version(version).download("coco", location=str(temp_dir))
+        print(f"   📥 Baixando versão {version} (formato COCO)...")
+        # Seguir exatamente o código do Roboflow
+        version_obj = project_obj.version(version)
+        dataset = version_obj.download("coco", location=str(output_dir))
         
-        actual_location = Path(dataset.location) if hasattr(dataset, 'location') else temp_dir
+        print(f"   ✅ Download concluído!")
+        print(f"   ⏳ Aguardando extração (isso pode demorar 10-30 segundos)...")
         
-        # Aguardar extração
-        max_wait = 45
+        # Aguardar a extração completa - o SDK demora para extrair
+        max_wait = 60
         waited = 0
+        found = False
         
         while waited < max_wait:
-            found_splits = []
-            for split in ["train", "valid", "test"]:
-                json_file = actual_location / f"{split}/_annotations.coco.json"
-                if json_file.exists():
-                    found_splits.append(split)
+            time.sleep(2)
+            waited += 2
             
-            if len(found_splits) >= 1:
-                time.sleep(3)
-                break
+            # Verificar se já apareceram os splits
+            if output_dir.exists():
+                all_dirs = [d for d in output_dir.rglob("*") if d.is_dir()]
+                has_splits = any("train" in d.name or "valid" in d.name or "test" in d.name for d in all_dirs)
+                
+                if has_splits:
+                    print(f"   ✅ Arquivos detectados após {waited}s")
+                    found = True
+                    break
             
-            time.sleep(1)
-            waited += 1
-            if waited % 5 == 0:
-                print(f"   ⏳ Aguardando... ({waited}s)")
+            if waited % 10 == 0:
+                print(f"   ⏳ Ainda aguardando... ({waited}s)")
         
-        # Mover para diretório final
+        if not found:
+            print(f"   ⚠️  Timeout após {waited}s. Verificando o que foi baixado...")
+        
+        # Verificar o que foi baixado e encontrar onde estão os splits
+        print(f"   🔍 Localizando arquivos do dataset...")
+        
+        # DEBUG: Listar tudo que foi baixado
+        print(f"   📁 Conteúdo em {output_dir}:")
+        if output_dir.exists():
+            all_items = sorted(list(output_dir.rglob("*")))[:40]
+            for item in all_items:
+                rel_path = item.relative_to(output_dir)
+                prefix = "📁" if item.is_dir() else "📄"
+                print(f"      {prefix} {rel_path}")
+        
+        # O Roboflow pode criar subdiretórios. Procurar onde estão os splits
+        possible_roots = [
+            output_dir,
+            output_dir / project,
+            output_dir / f"{project}-{version}",
+        ]
+        
+        # Adicionar todos os subdiretórios encontrados
         if output_dir.exists():
             for item in output_dir.iterdir():
-                if item.is_dir():
-                    shutil.rmtree(item)
-                elif not item.name.startswith('.'):
-                    item.unlink()
-        else:
-            output_dir.mkdir(parents=True, exist_ok=True)
+                if item.is_dir() and item not in possible_roots:
+                    possible_roots.append(item)
         
-        for item in actual_location.iterdir():
-            if not item.name.startswith('.'):
-                dest = output_dir / item.name
-                if item.is_dir():
-                    if dest.exists():
-                        shutil.rmtree(dest)
-                    shutil.move(str(item), str(dest))
-                else:
-                    shutil.move(str(item), str(dest))
+        dataset_root = None
+        for root in possible_roots:
+            if root.exists():
+                # Verificar se tem os diretórios de splits
+                has_train = (root / "train" / "_annotations.coco.json").exists()
+                has_valid = (root / "valid" / "_annotations.coco.json").exists()
+                has_test = (root / "test" / "_annotations.coco.json").exists()
+                
+                if has_train or has_valid or has_test:
+                    dataset_root = root
+                    print(f"   📍 Dataset encontrado em: {root.relative_to(output_dir.parent)}")
+                    break
         
+        if dataset_root is None:
+            # Listar o que foi baixado para debug
+            print(f"   ⚠️  Estrutura de splits não encontrada. Conteúdo baixado:")
+            if output_dir.exists():
+                for item in sorted(output_dir.rglob("*"))[:20]:
+                    rel_path = item.relative_to(output_dir)
+                    print(f"      {'📁' if item.is_dir() else '📄'} {rel_path}")
+            raise RuntimeError(
+                f"Dataset baixado mas estrutura de splits não encontrada.\n"
+                f"Verifique se a versão {version} está corretamente configurada no Roboflow."
+            )
+        
+        # Se o dataset está em um subdiretório, mover para o diretório principal
+        if dataset_root != output_dir:
+            print(f"   📦 Movendo arquivos para o diretório principal...")
+            
+            # Criar temp para evitar conflitos
+            temp_root = output_dir.parent / f"temp_{output_dir.name}"
+            
+            # Copiar conteúdo
+            for item in dataset_root.iterdir():
+                if not item.name.startswith('.'):
+                    dest = temp_root / item.name
+                    if item.is_dir():
+                        shutil.copytree(item, dest)
+                    else:
+                        temp_root.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(item, dest)
+            
+            # Remover output_dir e renomear temp
+            shutil.rmtree(output_dir)
+            shutil.move(str(temp_root), str(output_dir))
+            
+            print(f"   ✅ Arquivos reorganizados")
+        
+        # Verificar splits finais
+        splits_found = []
+        for split in ["train", "valid", "test"]:
+            split_dir = output_dir / split
+            json_file = split_dir / "_annotations.coco.json"
+            if json_file.exists():
+                try:
+                    with open(json_file, 'r') as f:
+                        coco_data = json.load(f)
+                    n_images = len(coco_data.get("images", []))
+                    n_anns = len(coco_data.get("annotations", []))
+                    print(f"   ✅ {split.upper():5s}: {n_images} imagens, {n_anns} anotações")
+                    splits_found.append(split)
+                except Exception as e:
+                    print(f"   ⚠️  {split.upper():5s}: erro ao ler JSON - {e}")
+        
+        if not splits_found:
+            raise RuntimeError("Nenhum split válido encontrado após download")
+        
+        print(f"   🎉 Dataset pronto: {len(splits_found)} split(s)")
         return output_dir
         
-    finally:
-        if temp_dir.exists():
+    except Exception as e:
+        print(f"   ❌ Erro no download SDK: {e}")
+        # Limpar em caso de erro
+        if output_dir.exists():
             try:
-                shutil.rmtree(temp_dir)
+                shutil.rmtree(output_dir)
             except:
                 pass
+        raise
 
 def verify_dataset(dataset_dir: Path) -> dict:
     """Verifica estrutura do dataset e retorna estatísticas."""
@@ -207,19 +328,19 @@ def main():
         type=str,
         choices=["sdk", "curl", "auto"],
         default="auto",
-        help="Método de download: sdk, curl, ou auto (tenta SDK primeiro, depois curl)"
+        help="Método de download: sdk, curl, ou auto"
     )
     parser.add_argument(
         "--download_url",
         type=str,
         default=None,
-        help="URL direta para download (método Raw URL do Roboflow). Se fornecido, usa curl."
+        help="URL direta para download (método curl)"
     )
     parser.add_argument(
         "--use_existing",
         type=str,
         default=None,
-        help="Usar dataset já baixado neste diretório (apenas verifica e copia se necessário)"
+        help="Usar dataset já baixado (apenas verifica)"
     )
     
     args = parser.parse_args()
@@ -276,18 +397,18 @@ def main():
             print(f"\n⚠️  ATENÇÃO: Splits faltando: {', '.join(missing)}")
             return
     
-    # Obter credenciais (args têm prioridade sobre .env)
+    # Obter credenciais
     api_key = args.api_key or os.getenv("ROBOFLOW_API_KEY")
     workspace = args.workspace or os.getenv("ROBOFLOW_WORKSPACE")
     project = args.project or os.getenv("ROBOFLOW_PROJECT")
-    version = args.version or int(os.getenv("ROBOFLOW_VERSION", "2"))
+    version = args.version or int(os.getenv("ROBOFLOW_VERSION", "3"))
     
     if not api_key:
-        raise ValueError("API Key do Roboflow não encontrada. Configure ROBOFLOW_API_KEY no .env ou use --api_key")
+        raise ValueError("API Key não encontrada. Configure no .env ou use --api_key")
     if not workspace:
-        raise ValueError("Workspace não encontrado. Configure ROBOFLOW_WORKSPACE no .env ou use --workspace")
+        raise ValueError("Workspace não encontrado. Configure no .env ou use --workspace")
     if not project:
-        raise ValueError("Projeto não encontrado. Configure ROBOFLOW_PROJECT no .env ou use --project")
+        raise ValueError("Projeto não encontrado. Configure no .env ou use --project")
     
     print(f"🔗 Conectando ao Roboflow...")
     print(f"   Workspace: {workspace}")
@@ -301,23 +422,26 @@ def main():
     if args.download_url:
         download_with_curl(args.download_url, dataset_dir)
     elif args.method == "curl":
-        # Tentar construir URL (requer acesso à API)
-        download_url = f"https://app.roboflow.com/ds/...?key={api_key}"
-        print("⚠️  URL direta não fornecida. Use --download_url ou --method sdk")
-        raise ValueError("URL de download necessária para método curl")
+        raise ValueError("Método curl requer --download_url")
     elif args.method == "sdk":
         download_with_sdk(api_key, workspace, project, version, dataset_dir)
     else:  # auto
         try:
-            print("🔄 Tentando método SDK primeiro...")
+            print("🔄 Método automático: tentando SDK primeiro...")
             download_with_sdk(api_key, workspace, project, version, dataset_dir)
         except Exception as e:
             print(f"⚠️  SDK falhou: {e}")
-            print("🔄 Tentando método curl...")
             if args.download_url:
+                print("🔄 Tentando método curl...")
                 download_with_curl(args.download_url, dataset_dir)
             else:
-                raise ValueError("SDK falhou e URL de download não fornecida. Use --download_url ou --method sdk")
+                print("\n❌ SDK falhou e nenhuma URL fornecida.")
+                raise ValueError(
+                    "SDK falhou e URL não fornecida.\n\n"
+                    "Soluções:\n"
+                    "1. Verifique as credenciais no .env\n"
+                    "2. Ou forneça --download_url para usar curl"
+                )
     
     print(f"✅ Dataset baixado e extraído com sucesso!")
     print(f"   Localização: {dataset_dir}")
@@ -339,18 +463,16 @@ def main():
                 n_categories = len(coco_data.get("categories", []))
                 print(f"   ✅ {split.upper():6s}: {n_images:4d} imagens, {n_annotations:4d} anotações, {n_categories} categorias")
             except Exception as e:
-                print(f"   ⚠️  {split.upper():6s}: JSON encontrado mas erro ao ler - {e}")
+                print(f"   ⚠️  {split.upper():6s}: erro - {e}")
         else:
             print(f"   ❌ {split.upper():6s}: JSON não encontrado")
     
     print("-" * 60)
     print(f"   📈 TOTAL: {stats['total_images']} imagens, {stats['total_annotations']} anotações")
     
-    # Verificar se todos os splits estão presentes
     missing_splits = [s for s in ["train", "valid", "test"] if s not in stats["splits_found"]]
     if missing_splits:
         print(f"\n⚠️  ATENÇÃO: Splits faltando: {', '.join(missing_splits)}")
-        print(f"   Certifique-se de que a versão {version} tem todos os splits configurados no Roboflow.")
     else:
         print(f"\n✅ Todos os splits (train/valid/test) estão presentes!")
 

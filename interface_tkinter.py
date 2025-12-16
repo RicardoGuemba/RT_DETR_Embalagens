@@ -142,40 +142,13 @@ class ModernTkinterApp:
         )
         title.pack(pady=(0, 20))
         
-        # Método de download
-        method_frame = ttk.LabelFrame(scrollable_frame, text="Método", padding=15)
-        method_frame.pack(fill=tk.X, pady=(0, 20))
-        
-        self.download_method_var = tk.StringVar(value="sdk")
-        
-        ttk.Radiobutton(
-            method_frame,
-            text="📥 Baixar do Roboflow (SDK Python)",
-            variable=self.download_method_var,
-            value="sdk"
-        ).pack(anchor=tk.W, pady=5)
-        
-        ttk.Radiobutton(
-            method_frame,
-            text="🌐 Baixar do Roboflow (URL Direta - curl)",
-            variable=self.download_method_var,
-            value="curl"
-        ).pack(anchor=tk.W, pady=5)
-        
-        ttk.Radiobutton(
-            method_frame,
-            text="📂 Usar Dataset Já Baixado",
-            variable=self.download_method_var,
-            value="existing"
-        ).pack(anchor=tk.W, pady=5)
-        
         # Frame para opções de download
-        download_options_frame = ttk.LabelFrame(scrollable_frame, text="Opções de Download", padding=15)
+        download_options_frame = ttk.LabelFrame(scrollable_frame, text="Download do Dataset", padding=15)
         download_options_frame.pack(fill=tk.X, pady=(0, 20))
         
         # Versão do dataset
-        ttk.Label(download_options_frame, text="Versão:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.version_var = tk.StringVar(value=os.getenv("ROBOFLOW_VERSION", "2"))
+        ttk.Label(download_options_frame, text="Versão do Dataset:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        self.version_var = tk.StringVar(value=os.getenv("ROBOFLOW_VERSION", "3"))
         version_spinbox = ttk.Spinbox(
             download_options_frame,
             from_=1,
@@ -185,42 +158,51 @@ class ModernTkinterApp:
         )
         version_spinbox.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
         
-        # URL direta (para método curl)
-        ttk.Label(download_options_frame, text="URL Direta:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        # URL Raw (opcional - só será pedida se SDK falhar)
+        ttk.Label(download_options_frame, text="URL Raw (opcional):").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
         self.download_url_var = tk.StringVar()
         url_entry = ttk.Entry(download_options_frame, textvariable=self.download_url_var, width=50)
         url_entry.grid(row=1, column=1, columnspan=2, sticky=tk.W+tk.E, padx=5, pady=5)
         ttk.Label(
             download_options_frame,
-            text="(Cole a URL Raw do Roboflow)",
+            text="(Deixe vazio para tentar SDK primeiro. Cole apenas se SDK falhar)",
             font=("Helvetica", 8),
             foreground="gray"
         ).grid(row=2, column=1, sticky=tk.W, padx=5)
         
-        # Dataset existente
-        existing_frame = ttk.LabelFrame(scrollable_frame, text="Dataset Existente", padding=15)
-        existing_frame.pack(fill=tk.X, pady=(0, 20))
+        # Opção para usar dataset existente (oculta por padrão)
+        self.use_existing_var = tk.BooleanVar(value=False)
+        existing_check = ttk.Checkbutton(
+            download_options_frame,
+            text="Usar dataset já baixado (em vez de baixar do Roboflow)",
+            variable=self.use_existing_var,
+            command=self.toggle_existing_dataset
+        )
+        existing_check.grid(row=3, column=0, columnspan=3, sticky=tk.W, padx=5, pady=10)
         
-        ttk.Label(existing_frame, text="Caminho:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        # Frame para dataset existente (inicialmente oculto)
+        self.existing_frame = ttk.LabelFrame(scrollable_frame, text="Dataset Existente", padding=15)
+        
+        ttk.Label(self.existing_frame, text="Caminho:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
         self.existing_dataset_var = tk.StringVar(value="/Users/ricardoguembarovski/Documents/Documentos_MacBook_Pro/Realtec/Buddmeyer/Automacao_Robo/RT_DETR_Embalagens/test_roboflow_v2")
-        existing_entry = ttk.Entry(existing_frame, textvariable=self.existing_dataset_var, width=50)
+        existing_entry = ttk.Entry(self.existing_frame, textvariable=self.existing_dataset_var, width=50)
         existing_entry.grid(row=0, column=1, sticky=tk.W+tk.E, padx=5, pady=5)
         ttk.Button(
-            existing_frame,
+            self.existing_frame,
             text="📁",
             command=lambda: self.browse_directory(self.existing_dataset_var)
         ).grid(row=0, column=2, padx=5, pady=5)
         
         # Diretório de destino
-        dest_frame = ttk.LabelFrame(scrollable_frame, text="Diretório de Destino", padding=15)
-        dest_frame.pack(fill=tk.X, pady=(0, 20))
+        self.dataset_dest_frame = ttk.LabelFrame(scrollable_frame, text="Diretório de Destino", padding=15)
+        self.dataset_dest_frame.pack(fill=tk.X, pady=(0, 20))
         
-        ttk.Label(dest_frame, text="Salvar em:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Label(self.dataset_dest_frame, text="Salvar em:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
         self.dataset_dest_var = tk.StringVar(value="dataset")
-        dest_entry = ttk.Entry(dest_frame, textvariable=self.dataset_dest_var, width=50)
+        dest_entry = ttk.Entry(self.dataset_dest_frame, textvariable=self.dataset_dest_var, width=50)
         dest_entry.grid(row=0, column=1, sticky=tk.W+tk.E, padx=5, pady=5)
         ttk.Button(
-            dest_frame,
+            self.dataset_dest_frame,
             text="📁",
             command=lambda: self.browse_directory(self.dataset_dest_var)
         ).grid(row=0, column=2, padx=5, pady=5)
@@ -1155,14 +1137,21 @@ class ModernTkinterApp:
         
         threading.Thread(target=verify_thread, daemon=True).start()
     
+    def toggle_existing_dataset(self):
+        """Mostra ou esconde o frame de dataset existente."""
+        if self.use_existing_var.get():
+            self.existing_frame.pack(fill=tk.X, pady=(0, 20), before=self.dataset_dest_frame)
+        else:
+            self.existing_frame.pack_forget()
+    
     def download_dataset(self):
-        """Baixa ou carrega dataset."""
-        method = self.download_method_var.get()
+        """Baixa ou carrega dataset usando método automático."""
         dataset_dir = self.dataset_dest_var.get()
         
         self.log_message(self.download_log, "="*70)
         
-        if method == "existing":
+        # Se usar dataset existente
+        if self.use_existing_var.get():
             # Usar dataset existente
             existing_path = self.existing_dataset_var.get()
             if not existing_path:
@@ -1212,46 +1201,38 @@ class ModernTkinterApp:
             threading.Thread(target=load_thread, daemon=True).start()
             return
         
-        # Verificar dependências para download
-        if method == "sdk":
-            try:
-                import roboflow
-            except ImportError:
-                messagebox.showerror(
-                    "Dependência Faltando",
-                    "O módulo 'roboflow' não está instalado!\n\n"
-                    "Para instalar, execute:\n"
-                    "  pip install roboflow\n\n"
-                    "Ou instale todas as dependências:\n"
-                    "  pip install -r requirements.txt"
-                )
-                return
-        
+        # Download do Roboflow (método automático)
         version = self.version_var.get()
+        download_url = self.download_url_var.get().strip()
         
-        self.log_message(self.download_log, f"📥 Iniciando download (método: {method})...")
+        self.log_message(self.download_log, f"📥 Iniciando download automático...")
         self.log_message(self.download_log, f"   Versão: {version}")
         self.log_message(self.download_log, f"   Destino: {dataset_dir}")
+        if download_url:
+            self.log_message(self.download_log, f"   URL Raw fornecida: {download_url[:60]}...")
+        else:
+            self.log_message(self.download_log, f"   Tentando SDK primeiro (sem URL)...")
         self.update_status_bar(f"Baixando dataset versão {version}...")
         
         def download_thread():
             try:
+                # Método automático: tenta SDK primeiro, se falhar usa curl
                 cmd = [
                     sys.executable,
                     "scripts/download_roboflow_coco.py",
                     "--dataset_dir", dataset_dir,
                     "--version", version,
-                    "--method", method
+                    "--method", "auto"
                 ]
                 
-                # Se método curl e URL fornecida
-                if method == "curl":
-                    download_url = self.download_url_var.get()
-                    if download_url:
+                # Se URL fornecida, adicionar para fallback
+                if download_url:
+                    # Validar URL básica
+                    if download_url.startswith(("http://", "https://")):
                         cmd.extend(["--download_url", download_url])
+                        self.log_message(self.download_log, f"\n📥 URL Raw configurada para fallback")
                     else:
-                        self.log_message(self.download_log, "\n⚠️  URL não fornecida! Tentando SDK...")
-                        cmd[-1] = "sdk"  # Fallback para SDK
+                        self.log_message(self.download_log, f"\n⚠️  URL inválida, ignorando. Tentando apenas SDK...")
                 
                 process = subprocess.Popen(
                     cmd,
@@ -1271,19 +1252,58 @@ class ModernTkinterApp:
                     self.update_status_bar("Download concluído!")
                     messagebox.showinfo("Sucesso", "Dataset baixado com sucesso!")
                 else:
-                    error_msg = "Erro ao baixar dataset."
-                    if "ModuleNotFoundError" in str(process.stdout):
-                        error_msg += "\n\nVerifique se todas as dependências estão instaladas:\n  pip install -r requirements.txt"
-                    self.log_message(self.download_log, "\n❌ Erro no download!")
-                    self.update_status_bar("Erro no download")
-                    messagebox.showerror("Erro", error_msg)
+                    # Se falhou e temos URL, tentar curl diretamente
+                    if download_url and download_url.startswith(("http://", "https://")):
+                        self.log_message(self.download_log, "\n⚠️  SDK falhou. Tentando método curl com URL fornecida...")
+                        cmd_curl = [
+                            sys.executable,
+                            "scripts/download_roboflow_coco.py",
+                            "--dataset_dir", dataset_dir,
+                            "--download_url", download_url
+                        ]
+                        
+                        process_curl = subprocess.Popen(
+                            cmd_curl,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            bufsize=1
+                        )
+                        
+                        for line in process_curl.stdout:
+                            self.log_message(self.download_log, line.strip())
+                        
+                        process_curl.wait()
+                        
+                        if process_curl.returncode == 0:
+                            self.log_message(self.download_log, "\n✅ Download concluído com curl!")
+                            self.update_status_bar("Download concluído!")
+                            messagebox.showinfo("Sucesso", "Dataset baixado com sucesso usando curl!")
+                        else:
+                            error_msg = "Erro ao baixar dataset. Ambos os métodos falharam."
+                            self.log_message(self.download_log, f"\n❌ {error_msg}")
+                            self.update_status_bar("Erro no download")
+                            messagebox.showerror("Erro", f"{error_msg} Verifique os logs.")
+                    else:
+                        error_msg = "Erro ao baixar dataset. SDK falhou e nenhuma URL Raw fornecida."
+                        self.log_message(self.download_log, f"\n❌ {error_msg}")
+                        self.log_message(self.download_log, "\n💡 Dica: Cole a URL Raw do Roboflow no campo 'URL Raw (opcional)' e tente novamente.")
+                        self.update_status_bar("Erro no download")
+                        messagebox.showerror(
+                            "Erro",
+                            f"{error_msg}\n\n"
+                            "Para obter a URL Raw:\n"
+                            "1. No Roboflow, escolha 'Show download code'\n"
+                            "2. Copie a URL direta (Raw URL)\n"
+                            "3. Cole no campo 'URL Raw (opcional)'\n"
+                            "4. Tente novamente"
+                        )
             
             except Exception as e:
-                error_msg = f"Erro: {e}"
-                if "ModuleNotFoundError" in str(e) or "No module named" in str(e):
-                    error_msg += "\n\nInstale as dependências:\n  pip install -r requirements.txt"
-                self.log_message(self.download_log, f"\n❌ {error_msg}")
-                messagebox.showerror("Erro", error_msg)
+                self.log_message(self.download_log, f"\n❌ Erro: {e}")
+                import traceback
+                self.log_message(self.download_log, traceback.format_exc())
+                messagebox.showerror("Erro", f"Erro: {e}")
         
         threading.Thread(target=download_thread, daemon=True).start()
     
