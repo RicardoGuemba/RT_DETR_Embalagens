@@ -1,6 +1,11 @@
-# ObjectDetection_DETR - Sistema de Detecção de Objetos
+# Aplicação de detecção voltada a embalagens
 
 Sistema completo para treinar e avaliar modelos DETR/RT-DETR usando datasets COCO JSON do Roboflow, otimizado para MacBook com Apple Silicon (MPS).
+
+**Arquivos de referência**
+
+- [AVALIACAO_SISTEMA.md](AVALIACAO_SISTEMA.md)
+- [IMPLEMENTACOES_CENTROIDE.md](IMPLEMENTACOES_CENTROIDE.md)
 
 ## 🚀 Início Rápido
 
@@ -304,4 +309,3 @@ Este projeto implementa várias camadas de proteção para suas credenciais:
 4. Configure novamente usando `scripts/setup_env.py`
 
 Veja `SECURITY.md` para mais detalhes.
-
